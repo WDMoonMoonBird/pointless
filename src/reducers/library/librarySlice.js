@@ -1,8 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { invoke } from '@tauri-apps/api/tauri';
 import { v4 as uuidv4 } from 'uuid';
-import { sanitizeFilename } from '../../helpers';
 import { imageExport, svgExport } from '../../utils/paper-export';
+import { exists } from '@tauri-apps/api/fs';
+import { EXPORTS_DIR } from '../../constants';
 
 const initialState = {
   folders: [],
@@ -62,7 +63,7 @@ const librarySlice = createSlice({
         }
       }
     },
-    deleteFolder: (state, action) => {
+    deleteFolderFromState: (state, action) => {
       const folderId = action.payload;
 
       // Delete the folder itself.
@@ -71,35 +72,61 @@ const librarySlice = createSlice({
       // Delete all the corresponding papers.
       state.papers = state.papers.filter((paper) => paper.folderId !== folderId);
     },
-    deletePaper: (state, action) => {
+    deletePaperFromState: (state, action) => {
       const id = action.payload;
       state.papers = state.papers.filter((paper) => paper.id !== id);
     },
-    loadLibrary: (state, action) => {
-      if (action.payload) {
-        state.folders = action.payload.folders;
-        state.papers = action.payload.papers;
+    loadFolders: (state, action) => {
+      if (Array.isArray(action.payload)) {
+        state.folders = action.payload;
       }
     },
-    saveLibrary: (state, action) => {
-      invoke('save_library', { libraryState: JSON.stringify(state.library) });
+    loadPapers: (state, action) => {
+      if (Array.isArray(action.payload)) {
+        state.papers = action.payload;
+      }
     },
-    exportPaper: (state, action) => {
-      const { id, exportType } = action.payload;
-
-      const paper = state.papers.find((paper) => paper.id === id);
-      const filename = `${sanitizeFilename(paper.name)}.${exportType}`;
-
-      let fn = exportType === 'svg' ? svgExport : imageExport;
-      fn(paper, filename, action.payload);
+    saveLibrary: (state) => {
+      invoke('save_library', { libraryState: JSON.stringify(state) });
     },
-
-    // TODO:
-    // exportFolder: (state, action) => {
-    //   const folderId = action.payload;
-    // }
   },
 });
+
+export const exportPaper = (payload) => async (dispatch, getState) => {
+  const state = getState();
+  const { id, filename, exportType } = payload;
+
+  const paper = state.library.papers.find((paper) => paper.id === id);
+  const alreadyExists = await exists(`${filename}`, { dir: EXPORTS_DIR });
+
+  if (alreadyExists) {
+    const overwrite = await confirm(`${filename} already exists, overwrite?`);
+    if (!overwrite) return;
+  }
+
+  let fn = exportType === 'svg' ? svgExport : imageExport;
+  fn(paper, filename, payload);
+};
+
+export const loadFolderContents = (payload) => async (dispatch, getState) => {
+  const folderId = payload;
+  const papers = await invoke('load_library_folder_papers', { folderId });
+  dispatch(loadPapers(papers));
+};
+
+export const deleteFolder = (payload) => async (dispatch, getState) => {
+  const folderId = payload;
+  await invoke('delete_library_folder', { folderId });
+  dispatch(deleteFolderFromState(folderId));
+};
+
+export const deletePaper = (payload) => async (dispatch, getState) => {
+  const state = getState();
+  const paperId = payload;
+  const { folderId } = state.library.papers.find((paper) => paper.id === paperId);
+  await invoke('delete_library_paper', { folderId, paperId });
+  dispatch(deletePaperFromState(paperId));
+};
 
 export const {
   newFolder,
@@ -107,11 +134,11 @@ export const {
   updateFolderName,
   updatePaperName,
   setPaperShapes,
-  deleteFolder,
-  deletePaper,
+  loadPapers,
+  deletePaperFromState,
+  deleteFolderFromState,
+  loadFolders,
   saveLibrary,
-  loadLibrary,
-  exportPaper,
 } = librarySlice.actions;
 
 export default librarySlice.reducer;

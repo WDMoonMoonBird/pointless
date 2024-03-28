@@ -1,3 +1,12 @@
+.revert-filename-changes:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.revert-filename-changes {
+  color: black;
+}
+
 .export-icon:hover {
   cursor: pointer;
 }
@@ -7,14 +16,19 @@
   opacity: 0.5;
 }
 
+.export-icon.disabled {
+  fill: #757575;
+  pointer-events: none;
+}
+
 @media (prefers-color-scheme: dark) {
-  .export-icon path {
+  .export-icon {
     fill: #fff;
   }
 }
 
 @media (prefers-color-scheme: light) {
-  .export-icon path {
+  .export-icon {
     fill: #000;
   }
 }

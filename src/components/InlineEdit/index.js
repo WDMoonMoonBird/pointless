@@ -33,6 +33,7 @@ class InlineEdit extends React.Component {
 
   onInputKeyPress = (e) => {
     if (e.which === KEY.ENTER) {
+      this.input.current.blur();
       this.toggleEdit(true);
     }
   };
@@ -65,6 +66,11 @@ class InlineEdit extends React.Component {
    */
   getInputWidth = () => {
     var span = document.createElement('span');
+
+    if (this.input.current) {
+      span.style.fontSize = window.getComputedStyle(this.input.current).fontSize;
+    }
+
     span.classList.add(styles['inline-edit__tmp-element']);
     const value = this.state.value !== null ? this.state.value : this.props.defaultValue;
     span.innerHTML = value.replaceAll(' ', '&nbsp;');
@@ -85,7 +91,7 @@ class InlineEdit extends React.Component {
           defaultValue={this.props.defaultValue}
           onChange={this.onChange}
           onBlur={this.onBlur}
-          onKeyPress={this.onInputKeyPress}
+          onKeyUp={this.onInputKeyPress}
           maxLength={this.props.maxlength}
         />
       );

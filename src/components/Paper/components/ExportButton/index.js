@@ -9,6 +9,8 @@ import Modal from '../../../Modal';
 import { ReactComponent as ExportIcon } from './../../../../assets/icons/export.svg';
 import { sanitizeFilename } from './../../../../helpers';
 import styles from './styles.module.css';
+import classNames from 'classnames';
+import InlineEdit from '../../../InlineEdit';
 
 const ALLOWED_TYPES = ['jpeg', 'png', 'svg'];
 
@@ -21,8 +23,8 @@ class ExportButton extends React.Component {
       theme: props.isDarkMode ? 'dark' : 'light',
       exportType: ALLOWED_TYPES[0],
       transparent: false,
-      exporting: false,
       location: 'unknown',
+      filename: props.paper.name,
     };
 
     this.state = this.initialState;
@@ -32,17 +34,22 @@ class ExportButton extends React.Component {
     });
   }
 
+  componentDidUpdate(prevProps) {
+    if (prevProps.paper.name !== this.props.paper.name) {
+      this.setState({ filename: this.props.paper.name });
+    }
+  }
+
   toggleOpen = () => {
     this.setState({ open: !this.state.open });
   };
 
   export = () => {
-    if (this.state.exporting) return false;
-
     store.dispatch(
       exportPaper({
         id: this.props.paper.id,
         theme: this.state.theme,
+        filename: this.getFilename(),
         exportType: this.state.exportType,
         transparent: this.state.transparent,
       }),
@@ -71,11 +78,45 @@ class ExportButton extends React.Component {
     });
   };
 
+  updateFilename = (filename) => {
+    this.setState({
+      filename: filename.replace(new RegExp(`(.(${ALLOWED_TYPES.join('|')}))+`, 'g'), ''),
+    });
+  };
+
+  revertFilenameBackToOriginal = () => {
+    this.setState({ filename: this.props.paper.name });
+  };
+
+  getFilename = () => {
+    return `${sanitizeFilename(this.state.filename)}.${this.state.exportType}`;
+  };
+
+  getFilenameLabel = () => {
+    if (sanitizeFilename(this.state.filename) === sanitizeFilename(this.props.paper.name)) {
+      return 'Filename';
+    }
+
+    return (
+      <>
+        <span>Filename (edited)</span>
+        <span
+          className={styles['revert-filename-changes']}
+          onClick={this.revertFilenameBackToOriginal}
+        >
+          revert
+        </span>
+      </>
+    );
+  };
+
   render() {
     return (
       <>
         <ExportIcon
-          className={styles['export-icon']}
+          className={classNames(styles['export-icon'], {
+            [styles['disabled']]: this.props.paper.shapes.length === 0,
+          })}
           width="20px"
           height="20px"
           onClick={this.toggleOpen}
@@ -95,24 +136,26 @@ class ExportButton extends React.Component {
             <div className="display-flex ellipsis">{this.state.location}</div>
           </div>
           <div className="form-group">
-            <div className="form-label">Name</div>
+            <div className="form-label">{this.getFilenameLabel()}</div>
             <div className="display-flex ellipsis">
-              {sanitizeFilename(this.props.paper.name)}.{this.state.exportType}
+              <InlineEdit defaultValue={this.getFilename()} onEditDone={this.updateFilename} />
             </div>
           </div>
-          <div className="form-group">
-            <div className="form-label">Theme</div>
-            <div className="display-flex">
-              <FormSelect defaultValue={this.theme} onChange={this.updateTheme}>
-                <option value="dark">dark</option>
-                <option value="light">light</option>
-              </FormSelect>
+          {this.state.exportType !== 'svg' && (
+            <div className="form-group">
+              <div className="form-label">Theme</div>
+              <div className="display-flex">
+                <FormSelect defaultValue={this.theme} onChange={this.updateTheme}>
+                  <option value="dark">dark</option>
+                  <option value="light">light</option>
+                </FormSelect>
+              </div>
             </div>
-          </div>
+          )}
           <div className="form-group">
             <div className="form-label">Type</div>
             <div className="display-flex">
-              <FormSelect defaultValue={this.exportType} onChange={this.updateType}>
+              <FormSelect defaultValue={this.state.exportType} onChange={this.updateType}>
                 <option value="jpeg">jpeg</option>
                 <option value="png">png</option>
                 <option value="svg">svg</option>
